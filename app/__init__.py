@@ -8,7 +8,7 @@ load_dotenv()  # take environment variables from .env.
 app = Flask(__name__)
 
 # Check if the environment is development
-if os.getenv("ENV") == "dev":
+if os.getenv("FLASK_ENV") == "development":
     app.config["MONGO_URI"] = os.getenv("MONGO_URI_DEV")
 else:
     app.config["MONGO_URI"] = os.getenv("MONGO_URI_PROD")
