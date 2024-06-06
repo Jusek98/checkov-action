@@ -46,9 +46,9 @@ zoo-zone-flask-app/
 
 - Create a .env file 
 
-- Add these environmment variables 
+- Add these environmment variables  and replace ```username``` and ```password``` by the actual values 
 ```bash
-MONGO_URI_PROD=mongodb+srv://thejuezio:8X7l2rf73h6SQIX1@cluster0.kfeir2a.mongodb.net/ZooZone?retryWrites=true&w=majority&appName=Cluster0
+MONGO_URI_PROD=mongodb+srv://<username>:<password>@cluster0.kfeir2a.mongodb.net/ZooZone?retryWrites=true&w=majority&appName=Cluster0
 MONGO_URI_DEV=mongodb://localhost:27017/ZooZone
 FLASK_ENV=development
 ```
@@ -122,10 +122,11 @@ To stop the application, press `Ctrl+C` in the terminal where `docker-compose` i
 docker-compose down
 ```
 
-## Check everything is working
+### Check everything is working
 
 ### 1. Check via the broswer 
-Go to this adress ```http://localhost:5000```
+Go to the adreess given in the terminal.
+
 You should see this message 
 ```bash 
 Welcome to ZooZone Flask App!
@@ -149,4 +150,14 @@ MongoDB connection successful
  * Restarting with stat
  * Debugger is active!
  * Debugger PIN: 194-337-520
+```
+
+
+## Check production Database
+To check if the production database works correctly you can go the url given by the terminal and add  ```/membres```
+
+
+You should see this 
+```bash 
+[{"name":"junior"}]
 ```
