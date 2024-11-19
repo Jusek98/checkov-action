@@ -1,7 +1,7 @@
 
-# ZooZone Flask App
+# Flask App
 
-This is a simple Flask application called "ZooZone Flask App". This guide explains how to set up and launch the application using Docker Compose.
+This is a simple Flask application called "Flask App". This guide explains how to set up and launch the application using Docker Compose.
 You have 2 main ways to run the application Locally or via Containers. You also have 2 databases a local one and a production one.  
 
 ## Project Structure
