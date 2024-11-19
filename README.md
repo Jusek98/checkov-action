@@ -1,163 +1,161 @@
+[![Maintained by Bridgecrew.io](https://img.shields.io/badge/maintained%20by-bridgecrew.io-blueviolet)](https://bridge.dev/2WBms5Q)
+[![slack-community](https://img.shields.io/badge/Slack-4A154B?style=plastic&logo=slack&logoColor=white)](https://slack.bridgecrew.io/)
 
-# Flask App
+# Checkov GitHub action
 
-This is a simple Flask application called "Flask App". This guide explains how to set up and launch the application using Docker Compose.
-You have 2 main ways to run the application Locally or via Containers. You also have 2 databases a local one and a production one.  
+This GitHub Action runs [Checkov](https://github.com/bridgecrewio/checkov) against infrastructure-as-code,
+open source packages, container images, and CI/CD configurations to identify misconfigurations, vulnerabilities, and license compliance issues.
 
-## Project Structure
+## Example usage for IaC and SCA
 
-```
-zoo-zone-flask-app/
-│
-├── app/
-│   ├── __init__.py
-│   ├── routes.py
-│
-├── requirements.txt
-├── run.py
-├── Dockerfile
-└── docker-compose.yml
-```
+```yaml
+name: checkov
 
-## Files and Directories
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
 
-- **app/**: Directory containing the Flask application code.
-  - **__init__.py**: Initializes the Flask app.
-  - **routes.py**: Contains the route definitions for the app.
-- **requirements.txt**: Lists the Python dependencies for the Flask app.
-- **run.py**: Entry point for running the Flask app.
-- **Dockerfile**: Defines the Docker image for the Flask app.
-- **docker-compose.yml**: Defines the Docker Compose services.
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
 
-## Requirements
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "scan"
+  scan:
+    permissions:
+      contents: read # for actions/checkout to fetch code
+      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
+      actions: read # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
+      
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
 
-- Docker
-- Docker Compose
-- Python 11
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so follow-up steps can access it
+      - uses: actions/checkout@v3
 
-
-## Local Setup
-
-
-### 1. Clone the project 
-
-
-### 2. Enviromment variable file 
-
-- Create a .env file 
-
-- Add these environmment variables  and replace ```username``` and ```password``` by the actual values 
-```bash
-MONGO_URI_PROD=mongodb+srv://<username>:<password>@cluster0.kfeir2a.mongodb.net/ZooZone?retryWrites=true&w=majority&appName=Cluster0
-MONGO_URI_DEV=mongodb://localhost:27017/ZooZone
-FLASK_ENV=development
-```
-To connect to your local Database you can launch the mongodb container with this command.
-
-```bash 
-docker-compose up -d db
-```
-
-If you want to use the production database in the .env file replace the value of the ```FLASK_ENV``` variable by ```production```
-
-### 3. Run the application 
-
-To run the application you can use this command at the root of your directory 
-
-```bash 
-python run.py 
-```
-You should get something like this in the terminal 
-```bash 
-MongoDB connection successful
- * Serving Flask app 'app' (lazy loading)
- * Environment: development
- * Debug mode: on
- * Running on all addresses.
-   WARNING: This is a development server. Do not use it in a production deployment.
- * Running on http://10.0.0.166:5000/ (Press CTRL+C to quit)
- * Restarting with stat
- * Debugger is active!
- * Debugger PIN: 194-337-520
+      - name: Checkov GitHub Action
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          # This will add both a CLI output to the console and create a results.sarif file
+          output_format: cli,sarif
+          output_file_path: console,results.sarif
+        
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v2
+        
+        # Results are generated only on a success or failure
+        # this is required since GitHub by default won't run the next step
+        # when the previous one has failed. Security checks that do not pass will 'fail'.
+        # An alternative is to add `continue-on-error: true` to the previous step
+        # Or 'soft_fail: true' to checkov.
+        if: success() || failure()
+        with:
+          sarif_file: results.sarif
 ```
 
-## Container Setup
+## Example usage for options/environment variables in 'with' block
 
-### 1. Environment Variable File
+```yaml
+on: [push]
+jobs:
+  checkov-job:
+    runs-on: ubuntu-latest
+    name: checkov-action
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@master
 
-1. **Create a `.env` file** in the root of your project directory.
-2. **Add environment variables** to the `.env` file. Make sure to update `MONGO_URI_DEV` as follows:
+      - name: Run Checkov action
+        id: checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: example/
+          file: example/tfplan.json # optional: provide the path for resource to be scanned. This will override the directory if both are provided.
+          check: CKV_AWS_1 # optional: run only a specific check_id. can be comma separated list
+          skip_check: CKV_AWS_2 # optional: skip a specific check_id. can be comma separated list
+          quiet: true # optional: display only failed checks
+          soft_fail: true # optional: do not return an error code if there are failed checks
+          framework: terraform # optional: run only on a specific infrastructure {cloudformation,terraform,kubernetes,all}
+          skip_framework: terraform # optional: skip a specific infrastructure {cloudformation,terraform,kubernetes,all}
+          skip_cve_package: CVE_2019_8331 # optional: skip a specific CVE package in SCA scans, can be comma separated list
+          output_format: sarif # optional: the output format, one of: cli, json, junitxml, github_failed_only, or sarif. Default: sarif
+          output_file_path: reports/results.sarif # folder and name of results file
+          output_bc_ids: true # optional: output Bridgecrew platform IDs instead of checkov IDs
+          download_external_modules: true # optional: download external terraform modules from public git repositories and terraform registry
+          repo_root_for_plan_enrichment: example/ #optional: Directory containing the hcl code used to generate a given terraform plan file. Use together with `file`
+          var_file: ./testdir/gocd.yaml # optional: variable files to load in addition to the default files. Currently only supported for source Terraform and Helm chart scans.
+          log_level: DEBUG # optional: set log level. Default WARNING
+          config_file: path/this_file
+          baseline: cloudformation/.checkov.baseline # optional: Path to a generated baseline file. Will only report results not in the baseline.
+          container_user: 1000 # optional: Define what UID and / or what GID to run the container under to prevent permission issues
+          use_enforcement_rules: true # optional - use enforcement rule configs from the platform
 
-```env
-MONGO_URI_DEV=mongodb://db:27017/ZooZone
 ```
 
-The `MONGO_URI_DEV` uses `db` instead of `localhost` to refer to the MongoDB service. This is because `db` is the service name defined in the Docker Compose configuration, allowing the Flask application container to communicate with the MongoDB container.
-### 2. Build and Run with Docker Compose
+## Example usage for container images
 
-Navigate to the project directory:
+```yaml
+on: [push]
 
-```bash
-cd zoo-zone-flask-app
+env:
+  IMAGE_NAME: ${{ github.repository }}:${{ github.sha }}
+  IMAGE_PATH: /path/
+
+jobs:
+  checkov-image-scan:
+    runs-on: ubuntu-latest
+    name: checkov-image-scan
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@master
+
+      - name: Build the image
+        run: docker build -t ${{ env.IMAGE_NAME }} ${{ env.IMAGE_PATH }}
+
+      - name: Run Checkov action
+        id: checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          quiet: true # optional: display only failed checks
+          soft_fail: true # optional: do not return an error code if there are failed checks
+          log_level: DEBUG # optional: set log level. Default WARNING
+          docker_image: ${{ env.IMAGE_NAME }} # define the name of the image to scan
+          dockerfile_path: ${{ format('{0}/Dockerfile', env.IMAGE_PATH) }} # path to the Dockerfile
+          container_user: 1000 # optional: Define what UID and / or what GID to run the container under to prevent permission issues
+          api-key: ${{ secrets.BC_API_KEY }} # Bridgecrew API key stored as a GitHub secret
 ```
 
-Build and start the services:
+Note that this example uses the latest version (`master`) but you could also use a static version (e.g. `v3`).
+Also, the check ids specified for '--check' and '--skip-check' must be mutually exclusive.
 
-```bash
-docker-compose up --build
-```
+## Example usage for private Terraform modules
 
-This command will build the Docker image and start the Flask application in a container. The application will be accessible at `http://localhost:5000`.
+To give `checkov` the possibility to download private GitHub modules you need to pass a valid GitHub PAT with the needed permissions.
 
+```yaml
+on: [push]
+jobs:
+  checkov-job:
+    runs-on: ubuntu-latest
+    name: checkov-action
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@master
 
-
-
-
-
-### 2. Stopping the Application
-
-To stop the application, press `Ctrl+C` in the terminal where `docker-compose` is running. To remove the containers, run:
-
-```bash
-docker-compose down
-```
-
-### Check everything is working
-
-### 1. Check via the broswer 
-Go to the adreess given in the terminal.
-
-You should see this message 
-```bash 
-Welcome to ZooZone Flask App!
-```
-
-### 2. Check via the logs 
-
-Run this command to check the logs 
-``` bash 
-docker logs -f zoo-zone-flask-app_web_1 
-```
-You should see something like this 
-```bash 
-MongoDB connection successful
- * Serving Flask app 'app' (lazy loading)
- * Environment: development
- * Debug mode: on
- * Running on all addresses.
-   WARNING: This is a development server. Do not use it in a production deployment.
- * Running on http://10.0.0.166:5000/ (Press CTRL+C to quit)
- * Restarting with stat
- * Debugger is active!
- * Debugger PIN: 194-337-520
-```
-
-
-## Check production Database
-To check if the production database works correctly you can go the url given by the terminal and add  ```/membres```
-
-
-You should see this 
-```bash 
-[{"name":"junior"}]
+      - name: Run Checkov action
+        id: checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          soft_fail: true
+          download_external_modules: true
+          github_pat: ${{ secrets.GH_PAT }}
+        env:
+          GITHUB_OVERRIDE_URL: true  # optional: this can be used to instruct the action to override the global GIT config to inject the PAT to the URL
 ```
